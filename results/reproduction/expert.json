@@ -1,0 +1,34 @@
+[
+  {
+    "case": "CCC, traffic, use_mesh_terrain=True",
+    "episodes": 10,
+    "mean_episode_reward": 339.1,
+    "success_rate": 1.0,
+    "expected": "300 < reward < 350",
+    "reproduced": true
+  },
+  {
+    "case": "CCC, traffic, use_mesh_terrain=False",
+    "episodes": 10,
+    "mean_episode_reward": 339.2,
+    "success_rate": 1.0,
+    "expected": "300 < reward < 350",
+    "reproduced": true
+  },
+  {
+    "case": "CCC, no traffic",
+    "episodes": 10,
+    "mean_episode_reward": 339.3,
+    "success_rate": 1.0,
+    "expected": "success = 1.0, 300 <= reward <= 350",
+    "reproduced": true
+  },
+  {
+    "case": "XTXTS intersections, no traffic",
+    "episodes": 10,
+    "mean_episode_reward": 411.5,
+    "success_rate": 1.0,
+    "expected": "success = 1.0, reward > 400",
+    "reproduced": true
+  }
+]

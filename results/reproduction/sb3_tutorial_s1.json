@@ -1,0 +1,10 @@
+{
+  "seed": 1,
+  "timesteps": 300000,
+  "episode_reward": 168.10397580102835,
+  "published_episode_reward": 168.7058092369063,
+  "arrive_dest": true,
+  "crash": false,
+  "out_of_road": false,
+  "train_minutes": 33.5
+}

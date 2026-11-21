@@ -1,0 +1,24 @@
+{
+  "dt": 0.1,
+  "lf": 1.05234,
+  "lr": 1.4166,
+  "length": 4.515,
+  "width": 1.852,
+  "max_speed": 22.22222222222222,
+  "k_steer": 0.6767486203567495,
+  "k_understeer": 0.00196097557440043,
+  "steer_delay_steps": 1,
+  "c_throttle": 3.3640755718497917,
+  "c_brake": 11.445248050522665,
+  "c_drag": -0.022155167828030287,
+  "c_const": -0.4150790344276354,
+  "fit": {
+    "n_longitudinal": 12030,
+    "n_lateral": 1047,
+    "longitudinal_rmse": 0.6971407237928282,
+    "longitudinal_r2": 0.969659755693893,
+    "lateral_rmse": 0.07328064347929757,
+    "lateral_r2": 0.9257947960417952,
+    "lateral_r2_without_delay": 0.7432130005870798
+  }
+}

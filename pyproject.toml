@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "drive-compare"
+version = "0.1.0"
+description = "PPO vs MPC vs MPPI for driving through traffic in MetaDrive (ROB-GY 6323 Project 9)"
+requires-python = ">=3.10"
+dependencies = [
+  "metadrive-simulator>=0.4.3",
+  "gymnasium>=0.28",
+  "numpy",
+  "scipy",
+  "pandas",
+  "shapely",
+  "stable-baselines3>=2.3",
+  "torch",
+  "casadi",
+  "pytorch-mppi",
+  "tensorboard",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["drive_compare*"]
+
+[tool.setuptools.package-data]
+drive_compare = ["vehicle_params.json"]
