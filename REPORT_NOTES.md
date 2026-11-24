@@ -50,12 +50,25 @@ test seeds have not been used yet.
 |---|---|---|---|
 | Rule-based IDM (MetaDrive) | 0.75 | 0.50 | 0.1 ms |
 | MetaDrive pretrained expert | 0.95 | 0.85 | 1.3 ms |
-| **MPC** (CasADi/IPOPT, 2 s horizon) | **1.00** | **0.85** | 9.5 ms (95th percentile 57 ms) |
+| **MPC** (CasADi/IPOPT, 2 s horizon; **100** dev seeds) | **1.00** | **0.97** | ~7 ms (95th percentile ~15 ms) |
 | PPO, first run (1M steps) | 0.20 | 0.10 | 0.3 ms |
 
-- **MPC:** the first version failed mainly by leaving the road. Waiting for crossing traffic at left turns, it
-  steered away from the predicted cars and onto the solid edge line. Adding a road-edge cost raised success from
-  0.95/0.70 to 1.00/0.85. Decisions stay within the 100 ms control period.
+IDM, expert and PPO are on 20 dev seeds per density; MPC is on 100.
+
+- **MPC, road-edge cost:** the first version failed mainly by leaving the road. Waiting for crossing traffic at
+  left turns, it steered away from the predicted cars and onto the solid edge line. Adding a road-edge cost raised
+  success from 0.95/0.70 to 1.00/0.85 (20 seeds).
+- **MPC, solver robustness:** IPOPT failed to converge on 5–7% of steps, mostly around the intersection, because
+  of two non-smooth points in the vehicle model (the throttle/brake switch and the zero-speed clamp). Smoothing
+  them raised convergence to >99.5%, cut the 95th-percentile decision time from ~45–60 ms to ~15 ms, and removed
+  all "waited too long" timeouts: 0.97/0.91 → 1.00/0.97 on 100 dev seeds (high density: 6 seeds fixed, none
+  broken; McNemar p = 0.03).
+- **MPC, traffic cost shape:** a Gaussian proximity cost (never zero) works far better than a hinge cost (zero
+  outside a safety ellipse): 1.00/0.97 vs 0.78/0.57. The Gaussian makes MPC react to traffic early.
+- **MPC, remaining failures** (3 of 100, high density) show the limits of the simple models: one crash with an
+  oncoming car turning into the same exit road (constant-velocity prediction assumed it would go straight), one
+  side impact while stopped mid-turn (traffic does not yield), and one road departure after oscillating next to
+  oncoming adjacent-lane traffic.
 - **PPO, first run:** never completed a turn (0 of 34 turning routes vs 6 of 12 straight). With MetaDrive's
   default reward, leaving the road costs only −5, so speeding and failing at the turn earns nearly as much as
   finishing. We will retrain with larger crash and off-road penalties.

@@ -54,6 +54,11 @@ class CostWeights:
     w_steer_rate: float = 2.0
     w_throttle_rate: float = 0.5
     w_proximity: float = 200.0
+    # "gaussian": w*exp(-q/2), never zero, so the planner reacts to traffic early (default).
+    # "hinge": w*max(0, 1-q)^2, zero outside the ellipse. Tested on 100 dev seeds per density with w=2000 and
+    # 5000: success fell from 1.00/0.97 to 0.78/0.57 (low/high), almost all crashes, because the cost gives no
+    # signal until a predicted overlap already exists. Kept only as a documented ablation.
+    proximity: str = "gaussian"
     w_road: float = 500.0
     road_margin: float = 0.5  # m kept from the solid line / road edge (covers corners when the car yaws)
     margin_long: float = 2.0  # m added to the ellipse's along-track semi-axis

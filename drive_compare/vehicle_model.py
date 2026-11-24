@@ -77,30 +77,40 @@ def _casadi_backend():
 BACKENDS = {"numpy": _numpy_backend, "torch": _torch_backend, "casadi": _casadi_backend}
 
 
-def _pos(z):
-    return (z + abs(z)) * 0.5
+def _abs(z, eps=0.0):
+    """|z|, or the smooth sqrt(z^2 + eps^2) when eps > 0 (differentiable everywhere, for gradient-based MPC)."""
+    return abs(z) if eps <= 0 else (z * z + eps * eps)**0.5
 
 
-def _neg(z):
-    return (z - abs(z)) * 0.5
+def _pos(z, eps=0.0):
+    return (z + _abs(z, eps)) * 0.5
 
 
-def acceleration(p: VehicleParams, v, u_tb):
+def _neg(z, eps=0.0):
+    return (z - _abs(z, eps)) * 0.5
+
+
+def acceleration(p: VehicleParams, v, u_tb, smooth: float = 0.0):
     """Longitudinal acceleration (m/s^2) for throttle/brake command u_tb at speed v."""
-    return p.c_throttle * _pos(u_tb) + p.c_brake * _neg(u_tb) + p.c_drag * v + p.c_const
+    return p.c_throttle * _pos(u_tb, smooth) + p.c_brake * _neg(u_tb, smooth) + p.c_drag * v + p.c_const
 
 
 def yaw_rate(p: VehicleParams, v, steer_prev, tan):
     return v / p.wheelbase * tan(p.k_steer * steer_prev) / (1.0 + p.k_understeer * v * v)
 
 
-def step(p: VehicleParams, x, u, backend: str = "numpy"):
-    """One DT step. x: (..., 5), u: (..., 2) for numpy/torch (batched over leading dims); 5x1 / 2x1 for casadi."""
+def step(p: VehicleParams, x, u, backend: str = "numpy", smooth: float = 0.0):
+    """One DT step. x: (..., 5), u: (..., 2) for numpy/torch (batched over leading dims); 5x1 / 2x1 for casadi.
+
+    smooth > 0 replaces the two kinks (throttle/brake switch at u=0, speed clamp at v=0) with smooth
+    approximations of width ~smooth. Gradient-based solvers (IPOPT) converge better on the smooth model;
+    sampling-based MPPI does not need it. Default 0 = the exact identified model.
+    """
     B = BACKENDS[backend]()
     px, py, yaw, v, steer_prev = (x[..., i] for i in range(NX)) if backend != "casadi" else (x[i] for i in range(NX))
     us, utb = (u[..., 0], u[..., 1]) if backend != "casadi" else (u[0], u[1])
-    a = acceleration(p, v, utb)
-    v_next = _pos(v + a * p.dt)  # no reversing: MetaDrive brakes to a stop when enable_reverse=False
+    a = acceleration(p, v, utb, smooth)
+    v_next = _pos(v + a * p.dt, smooth)  # no reversing: MetaDrive brakes to a stop when enable_reverse=False
     return B.stack([
         px + v * B.cos(yaw) * p.dt,
         py + v * B.sin(yaw) * p.dt,

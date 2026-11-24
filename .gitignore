@@ -7,3 +7,4 @@ results/trajectories/
 .pytest_cache/
 *.npz
 results/reproduction/logs/
+results/dev/*.log

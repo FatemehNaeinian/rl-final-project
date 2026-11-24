@@ -73,15 +73,31 @@ episode; there is a 60 s timeout.
 | `idm` (MetaDrive rule-based driver) | 0.75 [0.53, 0.89] | 0.50 [0.30, 0.70] | 0.1–0.2 ms |
 | `expert` (MetaDrive's pretrained PPO, own lidar observation) | 0.95 [0.76, 0.99] | 0.85 [0.64, 0.95] | 1.2–1.3 ms |
 | first `ppo` run (1M steps, MetaDrive default reward)* | 0.20 [0.08, 0.42] | 0.10 [0.03, 0.30] | 0.3 ms |
-| `mpc` (CasADi/IPOPT, 2 s horizon, default `CostWeights`) | 1.00 [0.84, 1.00] | 0.85 [0.64, 0.95] | 9.5 ms mean, 57 ms p95 |
+| `mpc` (CasADi/IPOPT, 2 s horizon), **100 dev seeds** | 1.00 [0.96, 1.00] | 0.97 [0.92, 0.99] | ~7 ms mean, 15–16 ms p95 |
 
 \* trained on the earlier 69-dim observation; it will not load with the current 71-dim one, so retrain.
 
-**MPC notes.** The first version (no road-edge term) scored 0.95 / 0.70. Its failures were mostly *off road*,
-not crashes: waiting for crossing traffic at a left turn, it steered right, away from the predicted cars, and
-touched the solid road line, which MetaDrive counts as out of road. Adding the road-edge cost (`w_road`,
-`road_band`) fixed that. The remaining high-density failures on dev are 1 crash, 1 off road and 1 timeout
-(it waited too long).
+**MPC notes.**
+- **Road-edge cost.** The first version (no road-edge term) scored 0.95 / 0.70 on 20 seeds. Its failures were
+  mostly *off road*: waiting for crossing traffic at a left turn, it steered away from the predicted cars and
+  touched the solid road line, which MetaDrive counts as out of road. Adding the road-edge cost fixed that.
+- **Solver robustness.** With the exact (non-smooth) model, IPOPT hit its iteration cap on 5–7% of steps,
+  mostly around the intersection, and the unfinished plan was applied. Smoothing the model's two kinks
+  (`smooth=0.02`) raised convergence to 99.6–99.9%, cut the 95th-percentile decision time from ~43–60 ms to
+  ~15 ms, and removed every timeout. On 100 dev seeds per density, success went from 0.97/0.91 to 1.00/0.97
+  (high density: 6 seeds fixed, 0 broken, exact McNemar p = 0.03). Rare >100 ms decisions (~0.25% of steps)
+  are scheduling jitter outside IPOPT: replaying the same problem solves in ~4 ms.
+- **Traffic cost shape.** A hinge cost (zero outside the safety ellipse) was much worse than the Gaussian
+  (0.78/0.57 vs 1.00/0.97). The Gaussian's never-zero tail makes MPC cautious early, at the price of slight
+  lateral wiggling next to adjacent-lane traffic.
+- **Remaining high-density failures (3/100):**
+  - Seed 200 leaves the road after wiggling next to oncoming adjacent-lane traffic.
+  - Seed 288 crashes into an oncoming car turning left into the same exit road; constant-velocity prediction
+    assumed it would go straight.
+  - Seed 231 is hit by a crossing car while stopped mid-turn; the traffic doesn't yield.
+- **Checks.** `tests/test_mpc.py` covers pulling away from standstill, lane/speed tracking, stopping behind a
+  blocked road, yielding to a crossing car, and plan consistency with the model. `scripts/diagnose_mpc.py`
+  reports solver status, iterations, decision time and closed-loop prediction error.
 
 **First PPO run: it never learned to turn.** It succeeded on 6 of 12 straight routes and 0 of 34 left/right
 routes, and its successful runs took 9.4 s against 14.5 s for `tracker`. It drives too fast and leaves the road
@@ -155,7 +171,10 @@ workers. `--device cuda` or fewer `n_epochs` are untested options.
 ## MPC (done) / MPPI (to implement)
 
 `drive_compare/controllers/mpc.py` is a working nonlinear MPC. The problem is built once, parameters are updated
-each step, it warm-starts from the shifted previous solution, and IPOPT is capped at 60 iterations / 80 ms.
+each step, it warm-starts from the shifted previous solution, and IPOPT is capped at 60 iterations / 80 ms of
+wall-clock time. MPC plans on a slightly smoothed copy of the shared model (`vehicle_model.step(..., smooth=0.02)`;
+the default `smooth=0` is unchanged for everyone else) and limits the solver to one linear-algebra thread, but only
+in processes that create an MPC controller.
 The stage cost (lateral + heading tracking, curvature-limited speed, effort, control changes, road edges,
 ellipse proximity to constant-velocity-predicted traffic) is documented in `controllers/predictive.py`,
 together with the shared helpers `build_reference`, `road_band` and `padded_traffic_prediction`.
