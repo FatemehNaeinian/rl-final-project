@@ -1,6 +1,6 @@
-"""Traffic motion prediction shared by MPC and MPPI.
+"""Traffic motion prediction used by the MPC.
 
-The plan specifies one simple model for both predictive controllers: constant velocity. Each visible
+The project plan fixes a simple traffic model: constant velocity. Each visible
 vehicle keeps its current velocity vector and heading over the planning horizon.
 """
 from __future__ import annotations

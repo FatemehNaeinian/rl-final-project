@@ -18,7 +18,7 @@ from .predictive import CostWeights, build_reference, padded_traffic_prediction,
 def _limit_solver_threads():
     """One linear-algebra thread for IPOPT/MUMPS: worker threads competing with the simulator roughly doubled
     the rare >100 ms decision-time spikes in testing. Called before casadi is first imported, and only when an
-    MPC controller is created, so other methods (PPO, MPPI) are unaffected. setdefault keeps any user choice."""
+    MPC controller is created, so other code in the process is unaffected. setdefault keeps any user choice."""
     for var in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
         os.environ.setdefault(var, "1")
 

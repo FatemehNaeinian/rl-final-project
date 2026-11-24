@@ -1,6 +1,6 @@
 """System identification: map MetaDrive's normalized actions to physical quantities.
 
-MetaDrive's action is [steer, throttle_brake] in [-1, 1]^2, but MPC/MPPI reason about a kinematic
+MetaDrive's action is [steer, throttle_brake] in [-1, 1]^2, but the MPC reasons about a kinematic
 bicycle with front-wheel angle (rad) and acceleration (m/s^2). This script drives the ego car with
 random piecewise-constant commands on an empty straight road, logs the response, and fits:
 

@@ -20,7 +20,7 @@ class Controller:
     def act(self, obs: np.ndarray, ws: WorldState) -> np.ndarray:
         """Return MetaDrive's action [steer, throttle_brake], each in [-1, 1].
 
-        obs: the fixed-size vector (what PPO sees). ws: the same information as a WorldState
-        (what MPC/MPPI use). Do not read anything else from the simulator.
+        obs: the same information as a fixed-size vector. ws: the WorldState (what MPC uses).
+        Do not read anything else from the simulator.
         """
         raise NotImplementedError

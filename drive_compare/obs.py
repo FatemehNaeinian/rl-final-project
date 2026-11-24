@@ -1,11 +1,11 @@
 """Shared observation interface.
 
-`StructuredObsWrapper` wraps the raw MetaDrive env so that every method sees the same information:
-  * observation (for PPO): a fixed-size vector encoding of the WorldState (ego, route ahead, K nearest cars)
-  * info["world_state"] (for MPC / MPPI / baselines): the WorldState itself (drive_compare.state)
+`StructuredObsWrapper` wraps the raw MetaDrive env so that every controller sees the same information:
+  * observation: a fixed-size vector encoding of the WorldState (ego, route ahead, K nearest cars)
+  * info["world_state"] (for MPC and the baselines): the WorldState itself (drive_compare.state)
 
 It also tracks the previous steering command (needed by the vehicle model, because steering acts with a
-one-step delay) and can add the plan's "abrupt control change" penalty to the reward for PPO training.
+one-step delay).
 """
 from __future__ import annotations
 
@@ -63,29 +63,19 @@ def encode(ws: WorldState, last_throttle: float) -> np.ndarray:
 
 
 class StructuredObsWrapper(gym.Wrapper):
-    """Wraps a MetaDrive env from drive_compare.env.make_env.
+    """Wraps a MetaDrive env from drive_compare.env.make_env."""
 
-    Args:
-        smoothness_penalty: weight w of the extra reward term -w * ||a_t - a_{t-1}||^2 (PPO training only;
-            leave at 0 for evaluation so rewards stay comparable to MetaDrive's).
-        include_world_state: put the WorldState in info (needed by planners and the evaluator; training
-            turns it off to avoid sending it between worker processes every step).
-    """
-
-    def __init__(self, env, smoothness_penalty: float = 0.0, include_world_state: bool = True):
+    def __init__(self, env):
         super().__init__(env)
-        self.include_world_state = include_world_state
         self.observation_space = gym.spaces.Box(-OBS_CLIP, OBS_CLIP, shape=(OBS_DIM,), dtype=np.float32)
         self.action_space = gym.spaces.Box(-1.0, 1.0, shape=(2,), dtype=np.float32)
-        self.smoothness_penalty = smoothness_penalty
         self.route: Route | None = None
         self.last_action = np.zeros(2)
 
     def _observe(self, info):
         ws = extract_world_state(self.env, self.route, steer_prev=float(self.last_action[0]))
         info = dict(info)
-        if self.include_world_state:
-            info["world_state"] = ws
+        info["world_state"] = ws
         return encode(ws, float(self.last_action[1])), info
 
     def reset(self, *, seed=None, options=None):
@@ -98,12 +88,6 @@ class StructuredObsWrapper(gym.Wrapper):
     def step(self, action):
         action = np.clip(np.asarray(action, dtype=float), -1.0, 1.0)
         _, reward, terminated, truncated, info = self.env.step(action)
-        if self.smoothness_penalty:
-            penalty = self.smoothness_penalty * float(np.sum((action - self.last_action)**2))
-            reward -= penalty
-            info["smoothness_penalty"] = penalty
         self.last_action = action
-        if terminated or truncated:
-            info["is_success"] = bool(info.get("arrive_dest", False))  # read by SB3's EvalCallback / Monitor
         obs, info = self._observe(info)
         return obs, reward, terminated, truncated, info

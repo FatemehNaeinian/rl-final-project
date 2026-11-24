@@ -5,7 +5,7 @@
   * traffic: every other vehicle within SENSE_RADIUS (position, yaw, speed, velocity vector, size)
   * route:   a dense polyline from the start to the destination, plus the ego's progress along it
 
-PPO sees a fixed-size vector encoding of this (drive_compare.obs); MPC/MPPI read the WorldState directly.
+drive_compare.obs also encodes it as a fixed-size vector; the MPC reads the WorldState directly.
 Both are derived from the same WorldState, so all methods get the same information.
 """
 from __future__ import annotations
@@ -62,7 +62,7 @@ class Route:
     def lookahead(self, s_from: float, distances) -> np.ndarray:
         """Route points [x, y, yaw] at arc lengths s_from + distances (clamped to the route end).
 
-        Useful for building an MPC/MPPI reference trajectory, e.g. distances = v_ref * dt * arange(H).
+        Useful for building an MPC reference trajectory, e.g. distances = v_ref * dt * arange(H).
         """
         query = np.clip(s_from + np.asarray(distances, dtype=float), 0.0, self.s[-1])
         idx = np.clip(np.searchsorted(self.s, query), 0, len(self.s) - 1)

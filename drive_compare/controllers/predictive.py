@@ -1,10 +1,10 @@
-"""Ingredients shared by the two predictive controllers (MPC in mpc.py, MPPI below).
+"""Cost weights and helpers for the MPC controller (mpc.py).
 
-Both must use the SAME ingredients so the comparison isolates the optimizer, not the model:
-  * dynamics:    drive_compare.vehicle_model.step(params, x, u, backend="casadi" | "torch")
+Ingredients:
+  * dynamics:    drive_compare.vehicle_model.step(params, x, u, backend="casadi")
   * reference:   build_reference(ws, ...)        -> route points, headings and desired speeds per step
   * traffic:     padded_traffic_prediction(ws, ...) (constant velocity, drive_compare.prediction)
-  * cost:        CostWeights and the stage cost described below
+  * road edges:  road_band(ws, ...)
   * actions:     MetaDrive's normalized [steer, throttle_brake] in [-1, 1]
 
 Stage cost at step k (state x_k = [px, py, yaw, v, steer_prev], action u_k):
@@ -22,10 +22,6 @@ Stage cost at step k (state x_k = [px, py, yaw, v, steer_prev], action u_k):
   + w_proximity * sum_j exp(-q_jk / 2)          predicted proximity to traffic vehicle j, where q_jk is
                                                 the squared ellipse distance in vehicle j's frame with
                                                 semi-axes (L_j + L_ego)/2 + margin_long, (W_j + W_ego)/2 + margin_lat
-MPPI starting point:
-  pytorch_mppi.MPPI(dynamics, running_cost, nx=5, noise_sigma=..., u_min=-1, u_max=1, device="cuda",
-  step_dependent_dynamics=True), where dynamics(x, u, t) = vehicle_model.step(params, x, u, backend="torch")
-  and running_cost(x, u, t) implements the stage cost above (BOTH receive the step index t with that flag).
 """
 from __future__ import annotations
 
@@ -36,7 +32,6 @@ import numpy as np
 from ..prediction import predict_constant_velocity
 from ..state import WorldState, wrap_angle
 from ..vehicle_model import load_params
-from .base import Controller
 
 FAR = 1e4  # where padded (absent) traffic vehicles are placed
 
@@ -110,18 +105,3 @@ def padded_traffic_prediction(ws: WorldState, w: CostWeights, dt: float):
         b[:n] = (ws.traffic_width[order] + ws.width) / 2 + w.margin_lat
     return xy, cy, sy, a, b
 
-
-class MPPIController(Controller):
-    name = "mppi"
-
-    def __init__(self, weights: CostWeights | None = None, num_samples: int = 1000, device: str = "cuda"):
-        self.p = load_params()
-        self.w = weights or CostWeights()
-        self.num_samples = num_samples
-        self.device = device
-
-    def reset(self, env, ws):
-        raise NotImplementedError("Create the pytorch_mppi.MPPI object here, then call .command(state) in act().")
-
-    def act(self, obs, ws):
-        raise NotImplementedError

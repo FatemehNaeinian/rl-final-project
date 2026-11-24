@@ -3,7 +3,7 @@
 Drives the intersection (no traffic) with the tracker baseline plus random action noise, and at many
 points along each episode compares an open-loop model rollout of the actions that were actually applied
 against what MetaDrive did. Reports position / heading / speed error at 0.5 s, 1 s and 2 s ahead.
-These numbers belong in the report's discussion of "how the approximate vehicle model affects MPC/MPPI".
+These numbers belong in the report's discussion of "how the approximate vehicle model affects MPC".
 
 Usage:  python scripts/validate_model.py [--episodes 15]
 """

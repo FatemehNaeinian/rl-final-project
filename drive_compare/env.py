@@ -1,6 +1,6 @@
-"""Shared MetaDrive environment configuration for all three controllers.
+"""Shared MetaDrive environment configuration for the MPC and the baselines.
 
-Every method (PPO, MPC, MPPI, baselines) must build its environment through `make_env` so that the
+Every controller (MPC and the baselines) must build its environment through `make_env` so that the
 map, traffic, termination rules, control period and seed splits are identical.
 
 Scenario: MetaDrive's 4-way intersection block ("X"). The seed decides which exit the route takes
@@ -25,8 +25,7 @@ DENSITIES = {"low": 0.1, "high": 0.3}
 # MetaDrive only accepts seeds inside [start_seed, start_seed + num_scenarios), so each split has its own range.
 SPLITS = {
     "test": (0, 200),  # held-out evaluation; the report uses the first 50 (more if time allows)
-    "dev": (200, 300),  # tuning MPC/MPPI cost weights and PPO hyperparameters
-    "train": (1000, 6000),  # PPO training only
+    "dev": (200, 300),  # tuning MPC cost weights
 }
 
 HORIZON = 600  # steps (60 s); routes are ~110-125 m, so this only cuts off stuck episodes

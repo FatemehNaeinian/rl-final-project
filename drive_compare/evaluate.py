@@ -2,7 +2,7 @@
 
 Examples:
   python -m drive_compare.evaluate --controller idm --n 50
-  python -m drive_compare.evaluate --controller ppo --model runs/ppo/final_model.zip --n 50
+  python -m drive_compare.evaluate --controller mpc --n 50
   python -m drive_compare.evaluate --controller tracker --densities 0 --n 20     # no-traffic sanity check
   python -m drive_compare.evaluate --summarize results/*.csv                      # compare saved runs
 
@@ -124,8 +124,7 @@ def paired_success_tests(df: pd.DataFrame) -> pd.DataFrame:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--controller", choices=["idm", "expert", "tracker", "ppo", "mpc", "mppi"])
-    ap.add_argument("--model", help="SB3 model path (for --controller ppo)")
+    ap.add_argument("--controller", choices=["idm", "expert", "tracker", "mpc"])
     ap.add_argument("--densities", nargs="+", default=["low", "high"],
                     help=f"names from {list(DENSITIES)} or numbers, e.g. 0 for no traffic")
     ap.add_argument("--split", default="test", choices=["test", "dev"])
@@ -143,7 +142,7 @@ def main():
         if not args.controller:
             ap.error("--controller is required unless --summarize is given")
         densities = [d if d in DENSITIES else float(d) for d in args.densities]
-        kwargs = {"model_path": args.model} if args.controller == "ppo" else {}
+        kwargs = {}
         df = evaluate(args.controller, densities, args.split, args.n, kwargs, args.save_traj)
         out = pathlib.Path(args.out or f"results/{args.controller}_{args.split}.csv")
         out.parent.mkdir(parents=True, exist_ok=True)

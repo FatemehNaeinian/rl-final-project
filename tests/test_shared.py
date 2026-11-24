@@ -20,13 +20,10 @@ def _random_states(n):
 
 
 def test_backends_agree():
-    """MPC (CasADi) and MPPI (PyTorch) must use numerically the same model as the NumPy reference."""
+    """The MPC's CasADi model must be numerically the same as the NumPy reference."""
     import casadi as ca
-    import torch
     X, U = _random_states(64), RNG.uniform(-1, 1, (64, 2))
     ref = step(P, X, U, "numpy")
-    tor = step(P, torch.tensor(X), torch.tensor(U), "torch").numpy()
-    np.testing.assert_allclose(tor, ref, rtol=1e-9, atol=1e-9)
     xs, us = ca.SX.sym("x", NX), ca.SX.sym("u", 2)
     f = ca.Function("f", [xs, us], [step(P, xs, us, "casadi")])
     cas = np.array([np.array(f(X[i], U[i])).ravel() for i in range(len(X))])

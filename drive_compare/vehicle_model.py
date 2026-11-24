@@ -1,10 +1,10 @@
-"""Approximate ego-vehicle model shared by MPC and MPPI, identified from MetaDrive by scripts/sysid.py.
+"""Approximate ego-vehicle model used by the MPC, identified from MetaDrive by scripts/sysid.py.
 
 State  x = [px, py, yaw, v, steer_prev]   (m, m, rad, m/s, normalized steering command of the previous step)
 Action u = [steer, throttle_brake]        (MetaDrive's own normalized action, each in [-1, 1])
 
 Planners optimize directly in MetaDrive's action space, so there is no separate inverse mapping in the
-control loop and PPO / MPC / MPPI all output exactly the same kind of action.
+control loop and every controller outputs exactly the same kind of action.
 
 Dynamics over one control period DT (0.1 s), fitted on an empty straight road:
   a        = c_throttle * max(u_tb, 0) + c_brake * min(u_tb, 0) + c_drag * v + c_const
@@ -12,7 +12,7 @@ Dynamics over one control period DT (0.1 s), fitted on an empty straight road:
   px'  = px + v * cos(yaw) * DT,   py' = py + v * sin(yaw) * DT
   yaw' = yaw + yaw_rate * DT,      v'  = max(v + a * DT, 0),     steer_prev' = u_steer
 
-The same `step` function runs on NumPy arrays, PyTorch tensors (batched, for MPPI) and CasADi symbols
+The same `step` function runs on NumPy arrays (batched) and CasADi symbols
 (for MPC): it only uses arithmetic, abs, and the trig functions of the backend passed in.
 """
 from __future__ import annotations
@@ -64,17 +64,12 @@ def _numpy_backend():
     return _Backend(np.cos, np.sin, np.tan, lambda xs: np.stack(xs, axis=-1))
 
 
-def _torch_backend():
-    import torch
-    return _Backend(torch.cos, torch.sin, torch.tan, lambda xs: torch.stack(xs, dim=-1))
-
-
 def _casadi_backend():
     import casadi as ca
     return _Backend(ca.cos, ca.sin, ca.tan, lambda xs: ca.vertcat(*xs))
 
 
-BACKENDS = {"numpy": _numpy_backend, "torch": _torch_backend, "casadi": _casadi_backend}
+BACKENDS = {"numpy": _numpy_backend, "casadi": _casadi_backend}
 
 
 def _abs(z, eps=0.0):
@@ -100,15 +95,15 @@ def yaw_rate(p: VehicleParams, v, steer_prev, tan):
 
 
 def step(p: VehicleParams, x, u, backend: str = "numpy", smooth: float = 0.0):
-    """One DT step. x: (..., 5), u: (..., 2) for numpy/torch (batched over leading dims); 5x1 / 2x1 for casadi.
+    """One DT step. x: (..., 5), u: (..., 2) for numpy (batched over leading dims); 5x1 / 2x1 for casadi.
 
     smooth > 0 replaces the two kinks (throttle/brake switch at u=0, speed clamp at v=0) with smooth
     approximations of width ~smooth. Gradient-based solvers (IPOPT) converge better on the smooth model;
-    sampling-based MPPI does not need it. Default 0 = the exact identified model.
+    Default 0 = the exact identified model.
     """
     B = BACKENDS[backend]()
-    px, py, yaw, v, steer_prev = (x[..., i] for i in range(NX)) if backend != "casadi" else (x[i] for i in range(NX))
-    us, utb = (u[..., 0], u[..., 1]) if backend != "casadi" else (u[0], u[1])
+    px, py, yaw, v, steer_prev = (x[..., i] for i in range(NX)) if backend == "numpy" else (x[i] for i in range(NX))
+    us, utb = (u[..., 0], u[..., 1]) if backend == "numpy" else (u[0], u[1])
     a = acceleration(p, v, utb, smooth)
     v_next = _pos(v + a * p.dt, smooth)  # no reversing: MetaDrive brakes to a stop when enable_reverse=False
     return B.stack([
@@ -121,17 +116,14 @@ def step(p: VehicleParams, x, u, backend: str = "numpy", smooth: float = 0.0):
 
 
 def rollout(p: VehicleParams, x0, U, backend: str = "numpy"):
-    """Roll out an action sequence U (H, 2) from x0 (5,). Returns states (H+1, 5). numpy/torch only."""
+    """Roll out an action sequence U (H, 2) from x0 (5,). Returns states (H+1, 5). numpy only."""
     xs = [x0]
     for k in range(len(U)):
         xs.append(step(p, xs[-1], U[k], backend))
-    if backend == "torch":
-        import torch
-        return torch.stack(xs)
     return np.stack(xs)
 
 
-# ---- convenience inverses (for hand-written controllers / analysis, not needed by MPC or MPPI) ----
+# ---- convenience inverses (for hand-written controllers / analysis, not needed by the MPC) ----
 
 def throttle_for_accel(p: VehicleParams, a_des, v) -> float:
     """Normalized throttle/brake that produces acceleration a_des at speed v under the fitted model."""
